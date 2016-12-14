@@ -1,0 +1,36 @@
+classdef FileClass
+    %FILECLASS Imported Files go in here
+    %   We attempt to import csvs through this scheme 
+    properties
+        Name
+        Path
+        Type
+        HeadInd
+        Headers
+        Data
+        Struct
+    end
+    properties (Constant)
+        head_dict = containers.Map({'cell', 'spec', 'press'},[4, 2, 1]);
+    end
+    methods
+        function obj = FileClass(type)
+            obj.Type = type;
+            obj.HeadInd = obj.head_dict(obj.Type); %setting where HeadInd is based off type
+        end
+        function name = FullPath(obj)
+            name = strcat(obj.Path, obj.Name);
+        end
+        function data = GetData(obj)
+            data = importdata(FullPath(obj),',', obj.HeadInd);
+            obj.Headers = data.colheaders;
+            obj.Data = data.data;
+            obj.Struct = struct([]);
+            for i = 1:length(obj.Headers)
+                obj.Struct.(obj.Headers{i}) = deal() 
+                = obj.Data(:,i);
+            end
+        end
+    end
+    
+end
