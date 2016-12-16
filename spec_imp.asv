@@ -1,5 +1,9 @@
 import FileClass
 clear
+
+plotting = true;
+debug = false;
+
 % import cell pressure
 CellPress = FileClass('cell');
 [CellPress.Name,CellPress.Path] = uigetfile('*.csv','Please choose Cell Pressure','file_cell_press.csv');
@@ -75,9 +79,7 @@ end
 [FullStruct(:).('slew_rate')] = deal(NaN(size(FullStruct.time_s)));
 field_name = char(names(~cellfun(@isempty,regexp(names,'(pressure_*)'))));
 for i = 2:length(FullStruct.time_s) % indexing from 2 b/c 1 = null
-   try 
-       slew = ( FullStruct.(field_name)(i) - FullStruct.(field_name)(i - 1))/FullStruct.time_diff(i);
-       FullStruct.slew_rate(i) = slew;
+   try FullStruct.slew_rate(i) = ( FullStruct.(field_name)(i) - FullStruct.(field_name)(i - 1))/FullStruct.time_diff(i);
    catch; end
 end
 % adding hydrodiff calculation
@@ -93,9 +95,72 @@ FullStruct.hydro_GPa(isnan(FullStruct.hydro_GPa))=-1.997918830000000e+02; % no N
 disp('A Spline has been fit, Goodness of fit is:')
 disp(gof)
 [FullStruct(:).('spline_hydro')] = deal(NaN(size(FullStruct.time_s)));
+[FullStruct(:).('spline_d1')] = deal(NaN(size(FullStruct.time_s)));
+[FullStruct(:).('spline_d2')] = deal(NaN(size(FullStruct.time_s)));
 for i = 1:length(FullStruct.time_s) % indexing from 2 b/c 1 = null
    try FullStruct.spline_hydro(i) = feval(f,FullStruct.time_s(i));
+       [FullStruct.spline_d1(i), FullStruct.spline_d2(i)] = differentiate(f, FullStruct.time_s(i));
    catch; end
+end
+d2 = FullStruct.spline_d2;
+FullStruct.spline_d2( abs(FullStruct.spline_d2-mean(FullStruct.spline_d2)) < 3.5*std(FullStruct.spline_d2) ) = 0;
+test = FullStruct.spline_d2;
+FullStruct.spline_d2 = d2;
+[p,l] = findpeaks(test);
+[pn, ln] = findpeaks(-test);
+if plotting
+    figure % new figure
+    ax1 = subplot(4,1,1); 
+    ax2 = subplot(4,1,2);
+    ax3 = subplot(4,1,3); 
+    ax4 = subplot(4,1,4);
+    plot(ax1,FullStruct.time_s, FullStruct.hydro_GPa)
+    title(ax1,'time vs hydro-GPa')
+    ylabel(ax1,'Cell Pressure-Hydro(GPa)')
+    axis(ax1, [min(FullStruct.time_s),max(FullStruct.time_s),0,max(FullStruct.hydro_GPa)])
+    plot(ax2,FullStruct.time_s, FullStruct.spline_d1)
+    title(ax2,'time vs 1st deriv hydro-GPa spline')
+    ylabel(ax2,'deriv hydro-GPa spline(GPa/s)')
+    axis(ax2, [min(FullStruct.time_s),max(FullStruct.time_s),-inf,+inf])
+    plot(ax3,FullStruct.time_s, FullStruct.spline_d2)
+    title(ax3,'time vs 2nd deriv hydro-GPa spline')
+    ylabel(ax3,'2nd deriv hydro-GPa spline(GPa/s^2)')
+    axis(ax3, [min(FullStruct.time_s),max(FullStruct.time_s),-inf,+inf])
+    plot(ax4,FullStruct.time_s,test);hold on
+    plot(ax4,FullStruct.time_s(l),p,'ko','MarkerFaceColor','g');
+    plot(ax4,FullStruct.time_s(ln),-pn,'ko','MarkerFaceColor','r')
+    title(ax4,'time vs peaks')
+    ylabel(ax4,'peaks(GPa/s^2)')
+    xlabel(ax4,'time(s)')
+    
+    figure % new figure
+    ax1 = subplot(2,1,1); 
+    ax2 = subplot(2,1,2);
+    ax3 = subplot(4,1,3); 
+    ax4 = subplot(4,1,4);
+    plot(ax1,FullStruct.pressure_bar, FullStruct.hydro_GPa)
+    title(ax1,'Membrane Pressure vs hydro-GPa')
+    ylabel(ax1,'Cell Pressure-Hydro(GPa)')
+    axis(ax1, [min(FullStruct.pressure_bar),max(FullStruct.pressure_bar),0,max(FullStruct.hydro_GPa)])
+    plot(ax2,FullStruct.pressure_bar, FullStruct.spline_hydro)
+    title(ax2,'pressure(bar) vs hydro-GPa spline')
+    ylabel(ax2,'deriv hydro-GPa spline(GPa)')
+    axis(ax2, [min(FullStruct.pressure_bar),max(FullStruct.pressure_bar),-inf,+inf])
+%     plot(ax3,FullStruct.pressure_bar, FullStruct.spline_d2)
+%     title(ax3,'pressure(bar) vs 2nd deriv hydro-GPa spline')
+%     ylabel(ax3,'2nd deriv hydro-GPa spline(GPa/s^2)')
+%     axis(ax3, [min(FullStruct.pressure_bar),max(FullStruct.pressure_bar),-inf,+inf])
+%     plot(ax4,FullStruct.pressure_bar,test);hold on
+%     plot(ax4,FullStruct.pressure_bar(l),p,'ko','MarkerFaceColor','g');
+%     plot(ax4,FullStruct.pressure_bar(ln),-pn,'ko','MarkerFaceColor','r')
+%     title(ax4,'pressure(bar) vs peaks')
+%     ylabel(ax4,'peaks(GPa/s^2)')
+%     xlabel(ax4,'pressure(bar)')
+end
+% phase transtions
+disp(['We have found ' num2str(min([length(l), length(ln)])) ' possible phase transtions. They are :'])
+for i = 1:min([length(l), length(ln)]) % This is a basic way of finding those transitions
+    disp(['The #' num2str(i) ' phase transition occured from : ' sprintf('%.2f',FullStruct.time_s(ln(i))) ' to ' sprintf('%.2f',FullStruct.time_s(l(i)))])
 end
 %writing video
 if vidstr == 'Y'
@@ -108,17 +173,19 @@ if vidstr == 'Y'
            if isequal(img, []) % if its blank, we write a black frame
                img = uint8(zeros(outputVideo.Height,outputVideo.Width));
            end
-           position =  [1 50; 100 50];
-           overlay = [['Time(s) : ' sprintf('%f',FullStruct.time_s{ii})] ...
-               ['Time Delta(s) : ' sprintf('%f',FullStruct.time_diff{ii})] ...
-               ['Membrane Pressure(bar) : ' sprintf('%.2f',FullStruct.time_s{ii})] ... % validate that it's bar??
-               ['Slew Rate(bar) : ' sprintf('%.2f',FullStruct.time_s{ii})] ...
-               ['Cell Pressure Hydro(GPa) : ' sprintf('%.4f',FullStruct.time_s{ii})] ...
-               ['Cell Pressure Hydro Spline(GPa)  : ' sprintf('%.4f',FullStruct.time_s{ii})] ...
-               ['Picture Name : ' sprintf('%f',FullStruct.time_s{ii})] ...
-               ];
-           img = 
-           if rem(ii,(length(FullStruct.pic_name)/50)) == 0
+           position =  [1 1; 1 20; 1 40; 1 60; 1 80; 1 100; 1 120];
+           overlay = {['Picture Name : ' FullStruct.pic_name{ii}] ...
+               ['Time(s) : ' sprintf('%.2f',FullStruct.time_s(ii))] ...
+               ['Time Delta(s) : ' sprintf('%.2f',FullStruct.time_diff(ii))] ...
+               ['Membrane Pressure(bar) : ' sprintf('%.2f',FullStruct.pressure_bar(ii))] ... % validate that it's bar??
+               ['Slew Rate(bar) : ' sprintf('%.2f',FullStruct.slew_rate(ii))] ...
+               ['Cell Pressure Hydro(GPa) : ' sprintf('%.4f',FullStruct.hydro_GPa(ii))] ...
+               ['Cell Pressure Hydro Spline(GPa)  : ' sprintf('%.4f',FullStruct.spline_hydro(ii))] ...
+               };
+           box_color = {'blue','yellow', 'yellow', 'green', 'green', 'red', 'red'};
+           img = insertText(img,position,overlay,'FontSize',11,'BoxColor',...
+    box_color,'BoxOpacity',0.2,'TextColor','white');
+           if rem(ii,100) == 0
                disp(['We are ' sprintf('%03.2f', (ii/length(FullStruct.pic_name)*100)) '% through video writing'])
            end
        end
