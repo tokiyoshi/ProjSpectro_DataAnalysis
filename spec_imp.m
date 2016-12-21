@@ -134,6 +134,7 @@ if plotting
     ylabel(ax4,'peaks(GPa/s^2)')
     xlabel(ax4,'time(s)')
     saveas(gcf, [CellPress.Path 'Time_v_Cell' '.bmp'])
+    saveas(gcf, [CellPress.Path 'Time_v_Cell'])
     
     figure % new figure
     ax1 = subplot(2,1,1); 
@@ -161,6 +162,7 @@ if plotting
 %     ylabel(ax4,'peaks(GPa/s^2)')
 %     xlabel(ax4,'pressure(bar)')
     saveas(gcf, [CellPress.Path 'Membrane vs Cell' '.bmp'])
+    saveas(gcf, [CellPress.Path 'Membrane vs Cell'])
 end
 % phase transtions
 disp(['We have found ' num2str(min([length(l), length(ln)])) ' possible phase transtions. They are :'])
@@ -181,9 +183,9 @@ if vidstr == 'Y'
            position =  [1 1; 1 20; 1 40; 1 60; 1 80; 1 100; 1 120];
            overlay = {['Picture Name : ' FullStruct.pic_name{ii}] ...
                ['Time(s) : ' sprintf('%.2f',FullStruct.time_s(ii))] ...
-               ['Time Delta(s) : ' sprintf('%.2f',FullStruct.time_diff(ii))] ...
+               ['Time Delta(s) : ' sprintf('%.4f',FullStruct.time_diff(ii))] ...
                ['Membrane Pressure(bar) : ' sprintf('%.2f',FullStruct.pressure_bar(ii))] ... % validate that it's bar??
-               ['Slew Rate(bar) : ' sprintf('%.2f',FullStruct.slew_rate(ii))] ...
+               ['Slew Rate(bar) : ' sprintf('%.4f',FullStruct.slew_rate(ii))] ...
                ['Cell Pressure Hydro(GPa) : ' sprintf('%.4f',FullStruct.hydro_GPa(ii))] ...
                ['Cell Pressure Hydro Spline(GPa)  : ' sprintf('%.4f',FullStruct.spline_hydro(ii))] ...
                };
